@@ -1,0 +1,28 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.slnx.user
+
+# .NET build output
+bin/
+obj/
+
+# Node
+node_modules/
+.next/
+out/
+
+# Expo
+.expo/
+dist/
+
+# Environment — NEVER commit
+.env
+.env.local
+.env*.local
+appsettings.Development.json
+
+# OS
+.DS_Store
+Thumbs.db

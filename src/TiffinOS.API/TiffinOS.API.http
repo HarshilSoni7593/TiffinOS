@@ -1,0 +1,6 @@
+@TiffinOS.API_HostAddress = http://localhost:5267
+
+GET {{TiffinOS.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
