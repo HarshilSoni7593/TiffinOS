@@ -12,5 +12,7 @@
 
         // Manual trigger — admin can regenerate if cron failed
         Task<int> RegenerateForDateAsync(Guid tenantId, DateOnly date);
+
+        Task GenerateDriverPayoutsAsync(Guid tenantId);
     }
 }

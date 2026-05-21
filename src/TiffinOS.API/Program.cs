@@ -151,6 +151,16 @@ using (var scope = app.Services.CreateScope())
             {
                 TimeZone = TimeZoneInfo.FindSystemTimeZoneById(tenant.Timezone)
             });
+
+        RecurringJob.AddOrUpdate<IDeliveryEngineService>(
+            $"driver-payouts-{tenant.Id}",
+            service => service.GenerateDriverPayoutsAsync(tenant.Id),
+            $"0 22 * * *",    // runs at 10 PM every day
+            new RecurringJobOptions
+            {
+                TimeZone = TimeZoneInfo.FindSystemTimeZoneById(tenant.Timezone)
+            });
+
     }
 }
 
