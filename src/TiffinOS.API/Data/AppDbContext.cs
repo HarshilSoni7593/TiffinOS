@@ -313,6 +313,18 @@ public class AppDbContext : DbContext
             e.Property(dp => dp.Currency).HasMaxLength(3).HasDefaultValue("INR");
             e.Property(dp => dp.CreatedAt).HasDefaultValueSql("now()");
             e.Property(dp => dp.UpdatedAt).HasDefaultValueSql("now()");
+            e.HasOne(dp => dp.CreatedByUser)
+             .WithMany()
+             .HasForeignKey(dp => dp.CreatedBy)
+             .IsRequired(false)
+             .OnDelete(DeleteBehavior.NoAction);
+
+            e.HasOne(dp => dp.UpdatedByUser)
+             .WithMany()
+             .HasForeignKey(dp => dp.UpdatedBy)
+             .IsRequired(false)
+             .OnDelete(DeleteBehavior.NoAction);
+
         });
 
         // DriverProfile

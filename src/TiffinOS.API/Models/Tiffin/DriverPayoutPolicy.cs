@@ -1,4 +1,6 @@
-﻿namespace TiffinOS.API.Models.Tiffin
+﻿using System.ComponentModel.DataAnnotations.Schema;
+
+namespace TiffinOS.API.Models.Tiffin
 {
     public class DriverPayoutPolicy
     {
@@ -13,11 +15,18 @@
         public string Currency { get; set; } = "CAD";
         public bool IsActive { get; set; } = true;
         public Guid? CreatedBy { get; set; }
+        public Guid? UpdatedBy { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
         public ICollection<DriverProfile> DriverProfiles { get; set; } = [];
         public ICollection<DriverPayoutRecord> PayoutRecords { get; set; } = [];
+
+        [ForeignKey(nameof(CreatedBy))]
+        public Common.User? CreatedByUser { get; set; }
+
+        [ForeignKey(nameof(UpdatedBy))]
+        public Common.User? UpdatedByUser { get; set; }
 
     }
 }

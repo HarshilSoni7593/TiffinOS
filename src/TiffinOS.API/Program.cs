@@ -1,7 +1,10 @@
+using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using TiffinOS.API.Controllers;
 using TiffinOS.API.Data;
 using TiffinOS.API.Extensions;
 using TiffinOS.API.Middleware;
@@ -17,6 +20,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<TenantContext>();
 builder.Services.AddScoped<CurrentUserContext>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IDeliveryEngineService, DeliveryEngineService>();
+builder.Services.AddScoped<DeliveryChargeRulesController>();
 
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException("Jwt:Key is not configured.");
@@ -82,6 +87,20 @@ builder.Services.AddSwaggerGen(c =>
     c.OperationFilter<TenantHeaderOperationFilter>();
 });
 
+// Hangfire — uses same PostgreSQL database, no extra infra needed
+builder.Services.AddHangfire(config => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UsePostgreSqlStorage(options =>
+        options.UseNpgsqlConnection(
+            builder.Configuration
+                .GetConnectionString("DefaultConnection"))));
+
+builder.Services.AddHangfireServer(options =>
+{
+    options.WorkerCount = 2;    // 2 workers is enough for this scale
+});
 
 var app = builder.Build();
 
@@ -90,6 +109,47 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+}
+
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    Authorization = new[]
+    {
+        new Hangfire.Dashboard.LocalRequestsOnlyAuthorizationFilter()
+    }
+});
+
+// Register recurring jobs for all active tenants
+// This runs once on startup — Hangfire stores the schedule
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var tenants = await db.Tenants
+        .Where(t => t.IsActive)
+        .ToListAsync();
+
+    foreach (var tenant in tenants)
+    {
+        // Packing summary — runs night before at tenant's configured time
+        RecurringJob.AddOrUpdate<IDeliveryEngineService>(
+            $"packing-summary-{tenant.Id}",
+            service => service.GeneratePackingSummaryAsync(tenant.Id),
+            $"0 {tenant.PrepScheduleTime.Hour} * * *",
+            new RecurringJobOptions
+            {
+                TimeZone = TimeZoneInfo.FindSystemTimeZoneById(tenant.Timezone)
+            });
+
+        // Dispatch list — runs morning of delivery day
+        RecurringJob.AddOrUpdate<IDeliveryEngineService>(
+            $"dispatch-list-{tenant.Id}",
+            service => service.GenerateDispatchListAsync(tenant.Id),
+            $"0 {tenant.DispatchScheduleTime.Hour} * * *",
+            new RecurringJobOptions
+            {
+                TimeZone = TimeZoneInfo.FindSystemTimeZoneById(tenant.Timezone)
+            });
+    }
 }
 
 app.UseHttpsRedirection();
