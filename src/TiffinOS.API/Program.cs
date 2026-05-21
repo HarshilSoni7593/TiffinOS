@@ -21,6 +21,7 @@ builder.Services.AddScoped<TenantContext>();
 builder.Services.AddScoped<CurrentUserContext>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IDeliveryEngineService, DeliveryEngineService>();
+builder.Services.AddScoped<IBlobService, AzureBlobService>();
 builder.Services.AddScoped<RouteOptimisationService>();
 builder.Services.AddScoped<DeliveryChargeRulesController>();
 
