@@ -1,20 +1,11 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthStore } from "@/store/authStore";
-import { Button } from "@/components/ui/button";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuLabel,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { LogOut, User } from "lucide-react";
 
-// Maps route paths to readable page titles
 const pageTitles: Record<string, string> = {
 	"/dashboard": "Dashboard",
 	"/menu-items": "Menu Items",
@@ -30,6 +21,8 @@ export default function Header() {
 	const pathname = usePathname();
 	const { logout } = useAuth();
 	const user = useAuthStore((s) => s.user);
+	const [open, setOpen] = useState(false);
+	const ref = useRef<HTMLDivElement>(null);
 
 	const title =
 		pageTitles[pathname] ??
@@ -38,46 +31,65 @@ export default function Header() {
 		] ??
 		"TiffinOS";
 
+	// Close dropdown when clicking outside
+	useEffect(() => {
+		const handleClick = (e: MouseEvent) => {
+			if (ref.current && !ref.current.contains(e.target as Node))
+				setOpen(false);
+		};
+		document.addEventListener("mousedown", handleClick);
+		return () => document.removeEventListener("mousedown", handleClick);
+	}, []);
+
 	return (
 		<header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 flex-shrink-0">
-			{/* Page title */}
 			<h1 className="text-lg font-semibold text-slate-800">{title}</h1>
 
-			{/* Right side */}
-			<div className="flex items-center gap-3">
-				{/* User menu */}
-				<DropdownMenu>
-					<DropdownMenuTrigger className="flex items-center gap-2 h-9 px-3 rounded-lg hover:bg-slate-100 transition-colors outline-none">
-						<div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center">
-							<span className="text-white text-xs font-semibold">
-								{user?.firstName?.charAt(0).toUpperCase()}
-							</span>
-						</div>
-						<span className="text-sm font-medium text-slate-700">
-							{user?.firstName}
+			<div className="relative" ref={ref}>
+				<button
+					onClick={() => setOpen((prev) => !prev)}
+					className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors">
+					<div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center">
+						<span className="text-white text-xs font-semibold">
+							{user?.firstName?.charAt(0).toUpperCase()}
 						</span>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end" className="w-48">
-						<DropdownMenuLabel>
-							<p className="text-sm font-medium">{user?.firstName}</p>
-							<p className="text-xs text-slate-500 font-normal">
-								{user?.email}
+					</div>
+					<span className="text-sm font-medium text-slate-700">
+						{user?.firstName}
+					</span>
+				</button>
+
+				{open && (
+					<div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl border border-slate-200 shadow-lg z-50 py-1 overflow-hidden">
+						{/* User info */}
+						<div className="px-4 py-3 border-b border-slate-100">
+							<p className="text-sm font-medium text-slate-800">
+								{user?.firstName}
 							</p>
-						</DropdownMenuLabel>
-						<DropdownMenuSeparator />
-						<DropdownMenuItem className="text-slate-600">
-							<User size={14} className="mr-2" />
+							<p className="text-xs text-slate-500 mt-0.5">{user?.email}</p>
+						</div>
+
+						{/* Profile */}
+						<button className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+							<User size={14} />
 							Profile
-						</DropdownMenuItem>
-						<DropdownMenuSeparator />
-						<DropdownMenuItem
-							className="text-red-600 focus:text-red-600"
-							onClick={logout}>
-							<LogOut size={14} className="mr-2" />
+						</button>
+
+						{/* Divider */}
+						<div className="border-t border-slate-100 my-1" />
+
+						{/* Logout */}
+						<button
+							onClick={() => {
+								setOpen(false);
+								logout();
+							}}
+							className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
+							<LogOut size={14} />
 							Sign out
-						</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
+						</button>
+					</div>
+				)}
 			</div>
 		</header>
 	);
