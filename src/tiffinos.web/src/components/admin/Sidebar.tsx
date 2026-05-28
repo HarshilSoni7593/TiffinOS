@@ -73,6 +73,12 @@ const navigation = [
 				permission: "tiffin:routes:view",
 			},
 			{
+				label: "Packing Summary",
+				href: "/packing",
+				icon: Package,
+				permission: "tiffin:packing:summary:view",
+			},
+			{
 				label: "Payouts",
 				href: "/payouts",
 				icon: Wallet,

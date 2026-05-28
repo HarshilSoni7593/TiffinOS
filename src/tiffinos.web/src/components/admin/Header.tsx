@@ -15,6 +15,7 @@ const pageTitles: Record<string, string> = {
 	"/drivers": "Drivers",
 	"/routes": "Routes",
 	"/payouts": "Payouts",
+	"/packing": "Packing Summary",
 };
 
 export default function Header() {
