@@ -602,7 +602,10 @@ function MenuItemDialog({
 							value={form.watch("categoryId")}
 							onValueChange={(v) => form.setValue("categoryId", v)}>
 							<SelectTrigger>
-								<SelectValue placeholder="Select a category" />
+								<SelectValue placeholder="Select a category">
+									{categories.find((c) => c.id == form.watch("categoryId"))
+										?.name ?? "Select Category"}
+								</SelectValue>
 							</SelectTrigger>
 							<SelectContent>
 								{categories.map((cat) => (
