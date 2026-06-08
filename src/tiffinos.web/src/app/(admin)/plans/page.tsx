@@ -45,10 +45,11 @@ import { cn } from "@/lib/utils";
 
 // ── Schemas ───────────────────────────────────────────────────
 const pricingTierSchema = z.object({
-	durationType: z.string().min(1),
-	pricePerDay: z.coerce.number().min(0.01),
-	billingCycleDays: z.coerce.number().min(1),
-	totalAmount: z.coerce.number().min(0.01),
+	templateId: z.string().min(1, "Template required"),
+	durationType: z.string(),
+	billingCycleDays: z.coerce.number(),
+	pricePerDay: z.coerce.number().min(0.01, "Price required"),
+	totalAmount: z.coerce.number(),
 });
 
 const planItemSchema = z.object({
@@ -120,6 +121,13 @@ export default function PlansPage() {
 				boxType: data.boxType || null,
 				description: data.description || null,
 				skipCreditPolicy: data.skipCreditPolicy || null,
+				pricingTiers: data.pricingTiers.map((t) => ({
+					templateId: t.templateId,
+					durationType: t.durationType,
+					pricePerDay: t.pricePerDay,
+					billingCycleDays: t.billingCycleDays,
+					totalAmount: t.totalAmount,
+				})),
 			}),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["plans"] });
@@ -387,33 +395,23 @@ function PlanDialog({
 			boxType: "",
 			allowSkip: false,
 			expiryReminderDays: 3,
-			pricingTiers: [
-				{
-					durationType: "daily",
-					pricePerDay: 0,
-					billingCycleDays: 1,
-					totalAmount: 0,
-				},
-				{
-					durationType: "weekly",
-					pricePerDay: 0,
-					billingCycleDays: 7,
-					totalAmount: 0,
-				},
-				{
-					durationType: "monthly",
-					pricePerDay: 0,
-					billingCycleDays: 30,
-					totalAmount: 0,
-				},
-			],
+			pricingTiers: [],
 			items: [],
 		},
 	});
 
-	const { fields: tierFields } = useFieldArray({
+	const {
+		fields: tierFields,
+		append: appendTier,
+		remove: removeTier,
+	} = useFieldArray({
 		control: form.control,
 		name: "pricingTiers",
+	});
+
+	const { data: templates = [] } = useQuery<any[]>({
+		queryKey: ["pricingTierTemplates"],
+		queryFn: () => api.get("/api/setup/pricing-tiers").then((r) => r.data),
 	});
 
 	const {
@@ -640,55 +638,158 @@ function PlanDialog({
 					{step === 2 && (
 						<div className="space-y-4">
 							<p className="text-sm text-slate-500">
-								Set prices for each subscription duration. Total amount is
-								calculated automatically.
+								Select which pricing tiers to offer on this plan and set the
+								price for each. Tier structure is managed in Setup → Pricing
+								Tiers.
 							</p>
 
-							{tierFields.map((field, index) => (
-								<div
-									key={field.id}
-									className="border border-slate-200 rounded-lg p-4 space-y-3">
-									<p className="text-sm font-medium text-slate-800 capitalize">
-										{field.durationType} Subscription
-									</p>
-									<div className="grid grid-cols-2 gap-3">
-										<div className="space-y-1">
-											<Label className="text-xs">Price per day (CAD)</Label>
-											<Input
-												type="number"
-												step="0.01"
-												placeholder="0.00"
-												className="h-8"
-												{...form.register(`pricingTiers.${index}.pricePerDay`)}
-												onBlur={(e) => {
-													form.setValue(
-														`pricingTiers.${index}.pricePerDay`,
-														parseFloat(e.target.value) || 0,
-													);
-													updateTotal(index, parseFloat(e.target.value) || 0);
-												}}
-											/>
+							{/* Template selection */}
+							<div className="space-y-3">
+								{templates.map((template: any) => {
+									const existingIndex = tierFields.findIndex(
+										(f) =>
+											form.watch(
+												`pricingTiers.${tierFields.indexOf(f)}.templateId`,
+											) === template.id,
+									);
+
+									// Check if this template is already selected
+									const selectedIndex = form
+										.watch("pricingTiers")
+										.findIndex((t: any) => t.templateId === template.id);
+
+									const isSelected = selectedIndex !== -1;
+
+									return (
+										<div
+											key={template.id}
+											className={cn(
+												"border-2 rounded-xl p-4 transition-all",
+												isSelected
+													? "border-blue-500 bg-blue-50"
+													: "border-slate-200 hover:border-slate-300",
+											)}>
+											<div className="flex items-center justify-between mb-3">
+												<div className="flex items-center gap-3">
+													{/* Checkbox toggle */}
+													<button
+														type="button"
+														onClick={() => {
+															if (isSelected) {
+																removeTier(selectedIndex);
+															} else {
+																appendTier({
+																	templateId: template.id,
+																	durationType: template.durationKey,
+																	billingCycleDays: template.deliveryDays,
+																	pricePerDay: 0,
+																	totalAmount: 0,
+																});
+															}
+														}}
+														className={cn(
+															"w-5 h-5 rounded border-2 flex items-center justify-center transition-colors",
+															isSelected
+																? "bg-blue-600 border-blue-600"
+																: "border-slate-300",
+														)}>
+														{isSelected && (
+															<Check size={12} className="text-white" />
+														)}
+													</button>
+													<div>
+														<p className="text-sm font-semibold text-slate-800">
+															{template.name}
+														</p>
+														<p className="text-xs text-slate-400">
+															{template.deliveryDays} deliveries ·{" "}
+															{template.description}
+														</p>
+													</div>
+												</div>
+
+												{isSelected && (
+													<div className="text-right">
+														<p className="text-sm font-bold text-blue-600">
+															$
+															{(
+																form.watch(
+																	`pricingTiers.${selectedIndex}.totalAmount`,
+																) ?? 0
+															).toFixed(2)}
+														</p>
+														<p className="text-xs text-slate-400">total</p>
+													</div>
+												)}
+											</div>
+
+											{/* Price input — only shown when selected */}
+											{isSelected && (
+												<div className="grid grid-cols-2 gap-3 pt-3 border-t border-blue-100">
+													<div className="space-y-1">
+														<label className="text-xs text-slate-500">
+															Price per delivery (CAD) *
+														</label>
+														<input
+															type="number"
+															step="0.01"
+															placeholder="0.00"
+															className="w-full h-8 px-3 rounded-md border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+															defaultValue={
+																form.getValues(
+																	`pricingTiers.${selectedIndex}.pricePerDay`,
+																) || ""
+															}
+															onBlur={(e) => {
+																const price = parseFloat(e.target.value) || 0;
+																const days = template.deliveryDays;
+																form.setValue(
+																	`pricingTiers.${selectedIndex}.pricePerDay`,
+																	price,
+																);
+																form.setValue(
+																	`pricingTiers.${selectedIndex}.totalAmount`,
+																	parseFloat((price * days).toFixed(2)),
+																);
+															}}
+														/>
+													</div>
+													<div className="space-y-1">
+														<label className="text-xs text-slate-500">
+															Total charged (auto)
+														</label>
+														<input
+															type="number"
+															readOnly
+															className="w-full h-8 px-3 rounded-md border border-slate-100 bg-white text-sm text-slate-600"
+															value={
+																form.watch(
+																	`pricingTiers.${selectedIndex}.totalAmount`,
+																) ?? 0
+															}
+														/>
+														<p className="text-xs text-slate-400">
+															price × {template.deliveryDays} deliveries
+														</p>
+													</div>
+												</div>
+											)}
 										</div>
-										<div className="space-y-1">
-											<Label className="text-xs">
-												Total amount ({field.billingCycleDays} days)
-											</Label>
-											<Input
-												type="number"
-												step="0.01"
-												className="h-8 bg-slate-50"
-												readOnly
-												{...form.register(`pricingTiers.${index}.totalAmount`)}
-											/>
-										</div>
-									</div>
-									{form.formState.errors.pricingTiers?.[index] && (
-										<p className="text-xs text-red-500">
-											Please enter a valid price
-										</p>
-									)}
-								</div>
-							))}
+									);
+								})}
+							</div>
+
+							{tierFields.length === 0 && (
+								<p className="text-xs text-center text-amber-600 bg-amber-50 py-2 rounded-lg">
+									Select at least one pricing tier to continue
+								</p>
+							)}
+
+							{form.formState.errors.pricingTiers?.message && (
+								<p className="text-xs text-red-500">
+									{form.formState.errors.pricingTiers.message}
+								</p>
+							)}
 
 							<div className="flex justify-between">
 								<Button
@@ -700,6 +801,7 @@ function PlanDialog({
 								<Button
 									type="button"
 									className="bg-blue-600 hover:bg-blue-700"
+									disabled={tierFields.length === 0}
 									onClick={() => setStep(3)}>
 									Next: Items →
 								</Button>
