@@ -14,6 +14,10 @@ import {
 	Wallet,
 	Package,
 	ChevronRight,
+	Settings,
+	Layers,
+	Truck,
+	CalendarOff,
 } from "lucide-react";
 
 const navigation = [
@@ -83,6 +87,35 @@ const navigation = [
 				href: "/payouts",
 				icon: Wallet,
 				permission: "tiffin:drivers:manage",
+			},
+		],
+	},
+	{
+		section: "Setup",
+		items: [
+			{
+				label: "Business Settings",
+				href: "/setup/business",
+				icon: Settings,
+				permission: "tenant:settings:manage",
+			},
+			{
+				label: "Pricing Tiers",
+				href: "/setup/pricing-tiers",
+				icon: Layers,
+				permission: "tenant:settings:manage",
+			},
+			{
+				label: "Delivery Charges",
+				href: "/setup/delivery-charges",
+				icon: Truck,
+				permission: "tenant:settings:manage",
+			},
+			{
+				label: "Holidays",
+				href: "/setup/holidays",
+				icon: CalendarOff,
+				permission: "tenant:settings:manage",
 			},
 		],
 	},

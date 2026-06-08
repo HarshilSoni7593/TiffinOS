@@ -16,6 +16,10 @@ const pageTitles: Record<string, string> = {
 	"/routes": "Routes",
 	"/payouts": "Payouts",
 	"/packing": "Packing Summary",
+	"/setup/business": "Business Settings",
+	"/setup/pricing-tiers": "Pricing Tiers",
+	"/setup/delivery-charges": "Delivery Charges",
+	"/setup/holidays": "Holidays",
 };
 
 export default function Header() {

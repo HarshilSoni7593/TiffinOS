@@ -660,7 +660,7 @@ function PlanDialog({
 												placeholder="0.00"
 												className="h-8"
 												{...form.register(`pricingTiers.${index}.pricePerDay`)}
-												onChange={(e) => {
+												onBlur={(e) => {
 													form.setValue(
 														`pricingTiers.${index}.pricePerDay`,
 														parseFloat(e.target.value) || 0,

@@ -73,31 +73,38 @@ export default function HomePage() {
 				</div>
 			</section>
 
-			{/* Plans Section */}
+			{/* Plans Teaser Section */}
 			<section id="plans" className="bg-slate-50 py-16">
-				<div className="max-w-5xl mx-auto px-6">
-					<div className="text-center mb-10">
-						<h2 className="text-3xl font-bold text-slate-800">
-							Choose your plan
-						</h2>
-						<p className="text-slate-500 mt-2">
-							Save more when you subscribe longer
-						</p>
+				<div className="max-w-5xl mx-auto px-6 text-center">
+					<h2 className="text-3xl font-bold text-slate-800">
+						Fresh tiffins for every budget
+					</h2>
+					<p className="text-slate-500 mt-3 max-w-lg mx-auto">
+						Choose from our carefully crafted tiffin plans. Save more when you
+						subscribe for longer.
+					</p>
+
+					{/* Quick stats */}
+					<div className="grid grid-cols-3 gap-6 max-w-lg mx-auto mt-10">
+						{[
+							{ value: `${plans.length}+`, label: "Plans available" },
+							{ value: "CAD", label: "Pricing in" },
+							{ value: "Daily", label: "Fresh delivery" },
+						].map((item) => (
+							<div key={item.label} className="text-center">
+								<p className="text-2xl font-bold text-blue-600">{item.value}</p>
+								<p className="text-xs text-slate-400 mt-1">{item.label}</p>
+							</div>
+						))}
 					</div>
 
-					{isLoading ? (
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-							{Array.from({ length: 2 }).map((_, i) => (
-								<Skeleton key={i} className="h-64 rounded-2xl" />
-							))}
-						</div>
-					) : (
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-							{plans.map((plan) => (
-								<PlanCard key={plan.id} plan={plan} />
-							))}
-						</div>
-					)}
+					<Link href="/tiffinplans">
+						<Button
+							size="lg"
+							className="mt-10 bg-blue-600 hover:bg-blue-700 h-12 px-10">
+							View All Plans & Pricing →
+						</Button>
+					</Link>
 				</div>
 			</section>
 
