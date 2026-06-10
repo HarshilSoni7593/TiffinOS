@@ -28,6 +28,8 @@ export default function CheckoutPage() {
 	const searchParams = useSearchParams();
 	const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 	const planId = searchParams.get("planId") ?? "";
+	const tenantSlug = process.env.NEXT_PUBLIC_TENANT_SLUG ?? "";
+	const user = useAuthStore((s) => s.user);
 
 	const [selectedTierId, setSelectedTierId] = useState("");
 	const [deliveryAddress, setDeliveryAddress] = useState("");
@@ -42,6 +44,13 @@ export default function CheckoutPage() {
 	const [deliveryLat, setDeliveryLat] = useState(0);
 	const [deliveryLng, setDeliveryLng] = useState(0);
 	const [step, setStep] = useState<1 | 2 | 3>(1);
+
+	const [regFirstName, setRegFirstName] = useState("");
+	const [regLastName, setRegLastName] = useState("");
+	const [regEmail, setRegEmail] = useState("");
+	const [regPassword, setRegPassword] = useState("");
+	const [regPhone, setRegPhone] = useState("");
+	const [regError, setRegError] = useState("");
 
 	useEffect(() => {
 		const tomorrow = new Date();
@@ -130,6 +139,78 @@ export default function CheckoutPage() {
 		},
 		onError: (e: any) =>
 			toast.error(e?.response?.data?.error ?? "Subscription failed"),
+	});
+
+	const registerAndSubscribe = useMutation({
+		mutationFn: async () => {
+			// Step 1 — create customer account
+			const registerResponse = await api.post(
+				"/api/auth/register",
+				{
+					email: regEmail.trim(),
+					password: regPassword,
+					firstName: regFirstName.trim(),
+					lastName: regLastName.trim(),
+					phone: regPhone.trim(),
+					role: "customer",
+					tenantSlug: tenantSlug,
+				},
+				{
+					headers: { "X-Tenant-Slug": tenantSlug },
+				},
+			);
+
+			const { accessToken, refreshToken } = registerResponse.data;
+
+			// Step 2 — store tokens so subsequent API call is authenticated
+			localStorage.setItem("accessToken", accessToken);
+			localStorage.setItem("refreshToken", refreshToken);
+
+			// Step 3 — decode JWT and update auth store
+			const { jwtDecode } = await import("jwt-decode");
+			const decoded: any = jwtDecode(accessToken);
+
+			const user = {
+				userId: decoded.sub,
+				tenantId: decoded.tenant_id,
+				email: decoded.email,
+				firstName: decoded.first_name,
+				roles: ["customer"],
+				permissions: decoded.permission ?? [],
+			};
+
+			useAuthStore.getState().setAuth(user, tenantSlug, tenantSlug);
+
+			// Step 4 — create subscription
+			const subscribeResponse = await api.post("/api/subscriptions", {
+				planId: planId,
+				pricingTierId: selectedTierId,
+				zoneId,
+				deliveryAddress: deliveryAddress.trim(),
+				deliveryLat,
+				deliveryLng,
+				floorOrUnit: floorOrUnit || null,
+				deliveryInstructions: instructions || null,
+				spicePreference: spicePreference || null,
+				startDate,
+			});
+
+			return subscribeResponse.data;
+		},
+		onSuccess: () => {
+			toast.success("Account created and subscription started!");
+			router.push("/my-subscription");
+		},
+		onError: (e: any) => {
+			const errorCode = e?.response?.data?.code;
+			if (errorCode === "EMAIL_TAKEN") {
+				setRegError(
+					"An account with this email already exists. Please sign in instead.",
+				);
+			} else {
+				toast.error(e?.response?.data?.error ?? "Registration failed");
+			}
+		},
 	});
 
 	if (!planId) {
@@ -375,99 +456,227 @@ export default function CheckoutPage() {
 
 				{/* Step 3 — Confirm */}
 				{step === 3 && (
-					<div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
-						<h2 className="font-semibold text-slate-800">Review your order</h2>
+					<div className="space-y-5">
+						{/* Account creation — only shown when not logged in */}
+						{(!isAuthenticated || !user?.roles.includes("customer")) && (
+							<div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+								<div>
+									<h2 className="font-semibold text-slate-800">
+										Create your account
+									</h2>
+									<p className="text-xs text-slate-400 mt-1">
+										We need an account to manage your subscription
+									</p>
+								</div>
 
-						{/* Summary rows */}
-						<div className="space-y-3 text-sm">
-							<div className="flex justify-between">
-								<span className="text-slate-500">Plan</span>
-								<span className="font-medium text-slate-800">{plan?.name}</span>
+								<div className="grid grid-cols-2 gap-3">
+									<div className="space-y-1">
+										<label className="text-xs text-slate-500">
+											First Name *
+										</label>
+										<input
+											type="text"
+											value={regFirstName}
+											onChange={(e) => setRegFirstName(e.target.value)}
+											placeholder="Priya"
+											className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										/>
+									</div>
+									<div className="space-y-1">
+										<label className="text-xs text-slate-500">
+											Last Name *
+										</label>
+										<input
+											type="text"
+											value={regLastName}
+											onChange={(e) => setRegLastName(e.target.value)}
+											placeholder="Mehta"
+											className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										/>
+									</div>
+								</div>
+
+								<div className="space-y-1">
+									<label className="text-xs text-slate-500">Email *</label>
+									<input
+										type="email"
+										value={regEmail}
+										onChange={(e) => {
+											setRegEmail(e.target.value);
+											setRegError("");
+										}}
+										placeholder="you@email.com"
+										className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+									/>
+								</div>
+
+								<div className="space-y-1">
+									<label className="text-xs text-slate-500">Password *</label>
+									<input
+										type="password"
+										value={regPassword}
+										onChange={(e) => setRegPassword(e.target.value)}
+										placeholder="Min 6 characters"
+										className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+									/>
+								</div>
+
+								<div className="space-y-1">
+									<label className="text-xs text-slate-500">Phone *</label>
+									<input
+										type="tel"
+										value={regPhone}
+										onChange={(e) => setRegPhone(e.target.value)}
+										placeholder="+1 647 555 0000"
+										className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+									/>
+								</div>
+
+								{regError && (
+									<div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+										<AlertCircle size={14} />
+										{regError}
+										<Link
+											href="/customer-login"
+											className="ml-auto text-blue-600 hover:underline text-xs">
+											Sign in instead
+										</Link>
+									</div>
+								)}
+
+								<p className="text-xs text-slate-400">
+									Already have an account?{" "}
+									<Link
+										href={`/customer-login`}
+										className="text-blue-600 hover:underline">
+										Sign in
+									</Link>
+								</p>
 							</div>
-							<div className="flex justify-between">
-								<span className="text-slate-500">Duration</span>
-								<span className="font-medium text-slate-800 capitalize">
-									{selectedTier?.durationType}
-								</span>
-							</div>
-							<div className="flex justify-between">
-								<span className="text-slate-500">Start date</span>
-								<span className="font-medium text-slate-800">{startDate}</span>
-							</div>
-							<div className="flex justify-between">
-								<span className="text-slate-500">Delivery to</span>
-								<span className="font-medium text-slate-800 text-right max-w-xs">
-									{deliveryAddress}
-									{floorOrUnit && `, ${floorOrUnit}`}
-								</span>
-							</div>
-							<div className="flex justify-between">
-								<span className="text-slate-500">Zone</span>
-								<span className="font-medium text-slate-800">{zoneName}</span>
-							</div>
-							{spicePreference && (
+						)}
+
+						{/* Order review — always shown */}
+						<div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
+							<h2 className="font-semibold text-slate-800">
+								Review your order
+							</h2>
+
+							<div className="space-y-3 text-sm">
 								<div className="flex justify-between">
-									<span className="text-slate-500">Spice</span>
-									<span className="font-medium text-slate-800 capitalize">
-										{spicePreference}
+									<span className="text-slate-500">Plan</span>
+									<span className="font-medium text-slate-800">
+										{plan?.name}
 									</span>
 								</div>
-							)}
-						</div>
-
-						{/* Price breakdown */}
-						<div className="border-t border-slate-100 pt-4 space-y-2">
-							<div className="flex justify-between text-sm">
-								<span className="text-slate-500">Plan cost</span>
-								<span className="text-slate-800">
-									${selectedTier?.totalAmount}
-								</span>
+								<div className="flex justify-between">
+									<span className="text-slate-500">Duration</span>
+									<span className="font-medium text-slate-800 capitalize">
+										{selectedTier?.durationType}
+									</span>
+								</div>
+								<div className="flex justify-between">
+									<span className="text-slate-500">Start date</span>
+									<span className="font-medium text-slate-800">
+										{startDate}
+									</span>
+								</div>
+								<div className="flex justify-between">
+									<span className="text-slate-500">Delivery to</span>
+									<span className="font-medium text-slate-800 text-right max-w-xs">
+										{deliveryAddress}
+										{floorOrUnit && `, ${floorOrUnit}`}
+									</span>
+								</div>
+								<div className="flex justify-between">
+									<span className="text-slate-500">Zone</span>
+									<span className="font-medium text-slate-800">{zoneName}</span>
+								</div>
+								{spicePreference && (
+									<div className="flex justify-between">
+										<span className="text-slate-500">Spice</span>
+										<span className="font-medium text-slate-800 capitalize">
+											{spicePreference}
+										</span>
+									</div>
+								)}
 							</div>
-							<div className="flex justify-between text-sm">
-								<span className="text-slate-500">Delivery</span>
-								<span
-									className={
-										chargePreview?.deliveryCharge === 0
-											? "text-green-600 font-medium"
-											: "text-slate-800"
-									}>
-									{chargePreview?.deliveryCharge === 0
-										? "Free"
-										: `$${chargePreview?.deliveryCharge}`}
-								</span>
-							</div>
-							<div className="flex justify-between font-semibold text-base border-t border-slate-100 pt-2">
-								<span className="text-slate-800">Total due now</span>
-								<span className="text-blue-600">
-									$
-									{(
-										(selectedTier?.totalAmount ?? 0) +
-										(chargePreview?.deliveryCharge ?? 0)
-									).toFixed(2)}{" "}
-									CAD
-								</span>
-							</div>
-						</div>
 
-						<div className="flex gap-3">
-							<Button
-								variant="outline"
-								onClick={() => setStep(2)}
-								className="flex-1">
-								← Back
-							</Button>
-							<Button
-								className="flex-1 bg-blue-600 hover:bg-blue-700"
-								onClick={() => subscribe.mutate()}
-								disabled={subscribe.isPending}>
-								{subscribe.isPending ? "Processing..." : "Confirm & Subscribe"}
-							</Button>
-						</div>
+							{/* Price breakdown */}
+							<div className="border-t border-slate-100 pt-4 space-y-2">
+								<div className="flex justify-between text-sm">
+									<span className="text-slate-500">Plan cost</span>
+									<span className="text-slate-800">
+										${selectedTier?.totalAmount}
+									</span>
+								</div>
+								<div className="flex justify-between text-sm">
+									<span className="text-slate-500">Delivery</span>
+									<span
+										className={
+											chargePreview?.deliveryCharge === 0
+												? "text-green-600 font-medium"
+												: "text-slate-800"
+										}>
+										{chargePreview?.deliveryCharge === 0
+											? "Free"
+											: `$${chargePreview?.deliveryCharge}`}
+									</span>
+								</div>
+								<div className="flex justify-between font-semibold text-base border-t border-slate-100 pt-2">
+									<span className="text-slate-800">Total due now</span>
+									<span className="text-blue-600">
+										$
+										{(
+											(selectedTier?.totalAmount ?? 0) +
+											(chargePreview?.deliveryCharge ?? 0)
+										).toFixed(2)}{" "}
+										CAD
+									</span>
+								</div>
+							</div>
 
-						<p className="text-xs text-slate-400 text-center">
-							Payment will be collected separately. You can cancel anytime from
-							your dashboard.
-						</p>
+							<div className="flex gap-3">
+								<Button
+									variant="outline"
+									onClick={() => setStep(2)}
+									className="flex-1">
+									← Back
+								</Button>
+
+								{/* Show different button based on auth state */}
+								{isAuthenticated && user?.roles.includes("customer") ? (
+									<Button
+										className="flex-1 bg-blue-600 hover:bg-blue-700"
+										onClick={() => subscribe.mutate()}
+										disabled={subscribe.isPending}>
+										{subscribe.isPending
+											? "Processing..."
+											: "Confirm & Subscribe"}
+									</Button>
+								) : (
+									<Button
+										className="flex-1 bg-blue-600 hover:bg-blue-700"
+										onClick={() => registerAndSubscribe.mutate()}
+										disabled={
+											registerAndSubscribe.isPending ||
+											!regFirstName.trim() ||
+											!regLastName.trim() ||
+											!regEmail.trim() ||
+											!regPassword ||
+											!regPhone.trim()
+										}>
+										{registerAndSubscribe.isPending
+											? "Creating account..."
+											: "Create Account & Subscribe"}
+									</Button>
+								)}
+							</div>
+
+							<p className="text-xs text-slate-400 text-center">
+								Payment will be collected separately. You can cancel anytime
+								from your dashboard.
+							</p>
+						</div>
 					</div>
 				)}
 			</div>

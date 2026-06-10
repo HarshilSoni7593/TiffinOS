@@ -20,6 +20,7 @@ const pageTitles: Record<string, string> = {
 	"/setup/pricing-tiers": "Pricing Tiers",
 	"/setup/delivery-charges": "Delivery Charges",
 	"/setup/holidays": "Holidays",
+	"/setup/payout-policies": "Payout Policies",
 };
 
 export default function Header() {

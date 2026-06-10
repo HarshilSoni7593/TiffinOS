@@ -112,6 +112,12 @@ const navigation = [
 				permission: "tenant:settings:manage",
 			},
 			{
+				label: "Payout Policies",
+				href: "/setup/payout-policies",
+				icon: Wallet,
+				permission: "tiffin:drivers:manage",
+			},
+			{
 				label: "Holidays",
 				href: "/setup/holidays",
 				icon: CalendarOff,
@@ -140,7 +146,7 @@ export default function Sidebar() {
 			</div>
 
 			{/* Navigation */}
-			<nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+			<nav className="flex-1 overflow-y-auto scrollbar-none px-3 py-4 space-y-6">
 				{navigation.map((group) => (
 					<div key={group.section}>
 						<p className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
